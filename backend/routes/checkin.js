@@ -54,14 +54,37 @@ router.post('/', authenticateToken, async (req, res) => {
     try {
         const { client_id, latitude, longitude, notes } = req.body;
 
-        if (!client_id) {
-            return res.status(400).json({ success: false, message: 'Client ID is required' });
+        // Basic input validation with clear messages
+        if (client_id === undefined || client_id === null || client_id === '') {
+            return res.status(400).json({ success: false, message: 'client_id is required' });
+        }
+
+        const clientIdNumber = Number(client_id);
+        if (!Number.isInteger(clientIdNumber) || clientIdNumber <= 0) {
+            return res.status(400).json({ success: false, message: 'client_id must be a valid positive integer' });
+        }
+
+        if (latitude == null || longitude == null) {
+            return res.status(400).json({
+                success: false,
+                message: 'Latitude and longitude are required to create a check-in'
+            });
+        }
+
+        const latNumber = Number(latitude);
+        const lonNumber = Number(longitude);
+
+        if (Number.isNaN(latNumber) || Number.isNaN(lonNumber)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Latitude and longitude must be valid numeric values'
+            });
         }
 
         // Check if employee is assigned to this client
         const [assignments] = await pool.execute(
             'SELECT * FROM employee_clients WHERE employee_id = ? AND client_id = ?',
-            [req.user.id, client_id]
+            [req.user.id, clientIdNumber]
         );
 
         if (assignments.length === 0) {
@@ -84,15 +107,22 @@ router.post('/', authenticateToken, async (req, res) => {
         //  fetch client location to calculate distance between employee and client
         const [clientRows] = await pool.execute(
             'SELECT latitude, longitude FROM clients WHERE id = ?',
-            [client_id]
+            [clientIdNumber]
         );
+
+        if (clientRows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Client not found'
+            });
+        }
 
         const client = clientRows[0];
 
         //  compute distance in km between current device location and client location
         const distanceKm = calculateDistanceKm(
-            Number(latitude),
-            Number(longitude),
+            latNumber,
+            lonNumber,
             Number(client?.latitude),
             Number(client?.longitude)
         );
@@ -101,7 +131,7 @@ router.post('/', authenticateToken, async (req, res) => {
             //  persist computed distance in distance_from_client column for reporting
             `INSERT INTO checkins (employee_id, client_id, latitude, longitude, distance_from_client, notes, status)
              VALUES (?, ?, ?, ?, ?, ?, 'checked_in')`,
-            [req.user.id, client_id, latitude, longitude, distanceKm, notes || null]
+            [req.user.id, clientIdNumber, latNumber, lonNumber, distanceKm, notes || null]
         );
 
         res.status(201).json({
@@ -143,10 +173,28 @@ router.put('/checkout', authenticateToken, async (req, res) => {
     }
 });
 
+// Helper to validate optional date strings in YYYY-MM-DD format
+function isValidDateFilter(dateStr) {
+    if (!dateStr) return true; // allow empty
+    if (typeof dateStr !== 'string') return false;
+    const match = /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+    if (!match) return false;
+    const date = new Date(dateStr);
+    const iso = date.toISOString().split('T')[0];
+    return iso === dateStr;
+}
+
 // Get check-in history
 router.get('/history', authenticateToken, async (req, res) => {
     try {
         const { start_date, end_date } = req.query;
+
+        if (!isValidDateFilter(start_date) || !isValidDateFilter(end_date)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid date filter. start_date and end_date must use YYYY-MM-DD format'
+            });
+        }
         
         let query = `
             SELECT ch.*, c.name as client_name, c.address as client_address
@@ -157,10 +205,12 @@ router.get('/history', authenticateToken, async (req, res) => {
         const params = [req.user.id];
 
         if (start_date) {
-            query += ` AND DATE(ch.checkin_time) >= '${start_date}'`;
+            query += ' AND DATE(ch.checkin_time) >= ?';
+            params.push(start_date);
         }
         if (end_date) {
-            query += ` AND DATE(ch.checkin_time) <= '${end_date}'`;
+            query += ' AND DATE(ch.checkin_time) <= ?';
+            params.push(end_date);
         }
 
         query += ' ORDER BY ch.checkin_time DESC';

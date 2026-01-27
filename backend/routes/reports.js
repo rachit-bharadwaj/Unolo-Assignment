@@ -29,6 +29,38 @@ router.get('/daily-summary', authenticateToken, requireManager, async (req, res)
 
         const managerId = req.user.id;
 
+        // Validate employee_id if provided
+        let employeeIdFilter = null;
+        if (employee_id !== undefined) {
+            if (employee_id === '') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'employee_id cannot be empty when provided'
+                });
+            }
+            const numericId = Number(employee_id);
+            if (!Number.isInteger(numericId) || numericId <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'employee_id must be a valid positive integer'
+                });
+            }
+            employeeIdFilter = numericId;
+
+            // Ensure the employee belongs to this manager's team
+            const [teamEmployeeRows] = await pool.execute(
+                'SELECT id FROM users WHERE id = ? AND manager_id = ?',
+                [employeeIdFilter, managerId]
+            );
+
+            if (teamEmployeeRows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Employee not found in your team'
+                });
+            }
+        }
+
         // Per-employee breakdown: check-ins, unique clients, and total working minutes (SQLite-compatible)
         let perEmployeeQuery = `
             SELECT 
@@ -51,9 +83,9 @@ router.get('/daily-summary', authenticateToken, requireManager, async (req, res)
         `;
         const perEmployeeParams = [date, managerId];
 
-        if (employee_id) {
+        if (employeeIdFilter != null) {
             perEmployeeQuery += ' AND u.id = ?';
-            perEmployeeParams.push(employee_id);
+            perEmployeeParams.push(employeeIdFilter);
         }
 
         perEmployeeQuery += ' GROUP BY u.id, u.name ORDER BY u.name ASC';
@@ -81,9 +113,9 @@ router.get('/daily-summary', authenticateToken, requireManager, async (req, res)
         `;
         const teamParams = [date, managerId];
 
-        if (employee_id) {
+        if (employeeIdFilter != null) {
             teamQuery += ' AND u.id = ?';
-            teamParams.push(employee_id);
+            teamParams.push(employeeIdFilter);
         }
 
         const [teamRows] = await pool.execute(teamQuery, teamParams);
@@ -114,7 +146,7 @@ router.get('/daily-summary', authenticateToken, requireManager, async (req, res)
             success: true,
             data: {
                 date,
-                employee_id: employee_id ? Number(employee_id) : null,
+                employee_id: employeeIdFilter,
                 team,
                 employees
             }
