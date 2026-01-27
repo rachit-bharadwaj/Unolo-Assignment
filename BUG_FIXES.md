@@ -33,3 +33,10 @@
 - **How I fixed it**: Changed the response to use `status(400)` (Bad Request) while keeping the same error message payload when `client_id` is not provided.
 - **Why this fix is correct**: A missing required field is a client-side input error and should use a 4xx status; using `400` allows frontend code and API consumers to reliably distinguish between successful and failed requests and aligns the endpoint with standard REST semantics.
 
+## Bug 6: Location data is not being saved correctly
+
+- **Location**: `backend/routes/checkin.js`, lines 56–60
+- **What was wrong**: The `INSERT` statement for the `checkins` table used non-existent columns `lat` and `lng` instead of the actual schema columns `latitude` and `longitude`. This prevented location coordinates from being stored correctly with new check-ins.
+- **How I fixed it**: Updated the `INSERT` to target `latitude` and `longitude` columns and kept passing the same `latitude` and `longitude` values from the request body.
+- **Why this fix is correct**: The database schema (and seed/init scripts) consistently use `latitude`/`longitude` for coordinate storage. Aligning the insert statement with these column names ensures that every new check-in persists the employee's location correctly and can be used later for distance calculations and reporting.
+
