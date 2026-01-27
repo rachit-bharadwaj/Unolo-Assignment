@@ -12,3 +12,10 @@
 - **How I fixed it**: Added `e.preventDefault();` as the first line inside `handleCheckIn` so that the form submission is handled entirely by React without triggering the browser's default navigation.
 - **Why this fix is correct**: In React, when using a form `onSubmit` handler, preventing the default browser submission is required to keep control within the SPA. With `e.preventDefault()`, the app can reliably execute the async API call, update state, and show success/error messages without unintended page reloads.
 
+## Bug 3: Dashboard shows incorrect data for some users
+
+- **Location**: `frontend/src/pages/Dashboard.jsx`, lines 13–20
+- **What was wrong**: The dashboard endpoint selection used `user.id === 1` to decide whether to call the manager stats API, assuming user with ID 1 is always the manager. This breaks when another user has manager role but a different ID, causing them to see the employee dashboard or incorrect data.
+- **How I fixed it**: Changed the endpoint selection logic to use the user's `role` (`user.role === 'manager' ? '/dashboard/stats' : '/dashboard/employee'`) instead of hardcoding an ID check.
+- **Why this fix is correct**: The backend already enforces manager access using the `role` in JWT; basing the frontend behavior on `role` keeps it consistent with the authorization logic and works for any manager user, regardless of their numeric ID.
+
