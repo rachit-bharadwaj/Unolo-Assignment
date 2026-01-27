@@ -4,6 +4,34 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+//  helper to calculate distance between employee and client locations in kilometers (Haversine formula)
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+    if (
+        lat1 == null || lon1 == null ||
+        lat2 == null || lon2 == null
+    ) {
+        return null;
+    }
+
+    const toRad = (value) => (value * Math.PI) / 180;
+
+    const R = 6371; // Earth radius in km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) *
+            Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d = R * c;
+
+    return d;
+}
+
 // Get assigned clients for employee
 router.get('/clients', authenticateToken, async (req, res) => {
     try {
@@ -53,17 +81,36 @@ router.post('/', authenticateToken, async (req, res) => {
             });
         }
 
+        //  fetch client location to calculate distance between employee and client
+        const [clientRows] = await pool.execute(
+            'SELECT latitude, longitude FROM clients WHERE id = ?',
+            [client_id]
+        );
+
+        const client = clientRows[0];
+
+        //  compute distance in km between current device location and client location
+        const distanceKm = calculateDistanceKm(
+            Number(latitude),
+            Number(longitude),
+            Number(client?.latitude),
+            Number(client?.longitude)
+        );
+
         const [result] = await pool.execute(
-            `INSERT INTO checkins (employee_id, client_id, latitude, longitude, notes, status)
-             VALUES (?, ?, ?, ?, ?, 'checked_in')`,
-            [req.user.id, client_id, latitude, longitude, notes || null]
+            //  persist computed distance in distance_from_client column for reporting
+            `INSERT INTO checkins (employee_id, client_id, latitude, longitude, distance_from_client, notes, status)
+             VALUES (?, ?, ?, ?, ?, ?, 'checked_in')`,
+            [req.user.id, client_id, latitude, longitude, distanceKm, notes || null]
         );
 
         res.status(201).json({
             success: true,
-            data: {
+                data: {
                 id: result.insertId,
-                message: 'Checked in successfully'
+                message: 'Checked in successfully',
+                //  expose distance so UI can show confirmation with distance value
+                distance_from_client: distanceKm
             }
         });
     } catch (error) {

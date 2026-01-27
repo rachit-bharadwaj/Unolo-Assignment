@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../utils/api';
 
 function CheckIn({ user }) {
@@ -55,6 +55,48 @@ function CheckIn({ user }) {
         }
     };
 
+    //  derive full client object from selected client id to access its coordinates
+    const selectedClientObj = useMemo(
+        () => clients.find((client) => client.id === Number(selectedClient)),
+        [clients, selectedClient]
+    );
+
+    //  compute real-time distance (in km) between current device location and selected client
+    const currentDistanceKm = useMemo(() => {
+        if (!location || !selectedClientObj) return null;
+
+        const toRad = (value) => (value * Math.PI) / 180;
+
+        const lat1 = location.latitude;
+        const lon1 = location.longitude;
+        const lat2 = selectedClientObj.latitude;
+        const lon2 = selectedClientObj.longitude;
+
+        if (
+            lat1 == null ||
+            lon1 == null ||
+            lat2 == null ||
+            lon2 == null
+        ) {
+            return null;
+        }
+
+        const R = 6371; // Earth radius in km
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) *
+                Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }, [location, selectedClientObj]);
+
     const handleCheckIn = async (e) => {
         e.preventDefault();
         setError('');
@@ -70,7 +112,15 @@ function CheckIn({ user }) {
             });
 
             if (response.data.success) {
-                setSuccess('Checked in successfully!');
+                //  show distance returned by backend after a successful check-in
+                const distance = response.data.data?.distance_from_client;
+                setSuccess(
+                    distance != null
+                        ? `Checked in successfully! Distance from client: ${distance.toFixed(
+                              2
+                          )} km`
+                        : 'Checked in successfully!'
+                );
                 setSelectedClient('');
                 setNotes('');
                 fetchData(); // Refresh data
@@ -185,6 +235,22 @@ function CheckIn({ user }) {
                                 ))}
                             </select>
                         </div>
+
+                        {selectedClientObj && currentDistanceKm != null && (
+                            <div className="mb-4 p-3 rounded-md bg-blue-50 border border-blue-100">
+                                <p className="text-sm text-blue-800">
+                                    Current distance to client:{' '}
+                                    <span className="font-semibold">
+                                        {currentDistanceKm.toFixed(2)} km
+                                    </span>
+                                </p>
+                                {currentDistanceKm > 0.5 && (
+                                    <p className="text-xs text-yellow-800 mt-1">
+                                        You are far from the client location (more than 500 meters).
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="mb-4">
                             <label className="block text-gray-700 text-sm font-medium mb-2">
