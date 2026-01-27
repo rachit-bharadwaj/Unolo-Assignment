@@ -6,18 +6,21 @@ function StatsCard({ title, value, multiplier = 1, onAlert }) {
 
     useEffect(() => {
         setDisplayValue(value);
-    }, []);
+    }, [value]);
 
     const calculatedValue = useMemo(() => {
         return displayValue * multiplier;
-    }, [displayValue]);
+    }, [displayValue, multiplier]);
 
     const handleClick = useCallback(() => {
-        setCount(count + 1);
-        if (count > 5) {
-            onAlert?.('High click count!');
-        }
-    }, []);
+        setCount((prev) => {
+            const next = prev + 1;
+            if (next > 5) {
+                onAlert?.('High click count!');
+            }
+            return next;
+        });
+    }, [onAlert]);
 
     const cardStyles = {
         padding: '1.5rem',

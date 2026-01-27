@@ -40,3 +40,10 @@
 - **How I fixed it**: Updated the `INSERT` to target `latitude` and `longitude` columns and kept passing the same `latitude` and `longitude` values from the request body.
 - **Why this fix is correct**: The database schema (and seed/init scripts) consistently use `latitude`/`longitude` for coordinate storage. Aligning the insert statement with these column names ensures that every new check-in persists the employee's location correctly and can be used later for distance calculations and reporting.
 
+## Bug 7: React stats card doesn't update correctly and has stale callbacks
+
+- **Location**: `frontend/src/components/StatsCard.jsx`, lines 3–20
+- **What was wrong**: The `StatsCard` component initialized `displayValue` from the `value` prop but only in a `useEffect` with an empty dependency array, so it never updated when `value` changed. Additionally, `useMemo` for `calculatedValue` ignored the `multiplier` dependency, and `handleClick` used `useCallback` with an empty dependency array while closing over `count` and `onAlert`, causing the click count and alert behavior to be based on stale values.
+- **How I fixed it**: Updated the `useEffect` to depend on `value`, added `multiplier` to the `useMemo` dependency array, and rewrote `handleClick` to use a functional `setCount` update with `onAlert` in the dependency array so it always sees the latest count and callback.
+- **Why this fix is correct**: Tying effect and memo dependencies to the props they derive from ensures `StatsCard` recomputes when its inputs change, and using a functional state update inside a properly memoized callback prevents stale closures while still avoiding unnecessary re-renders. This makes the component respond correctly to prop changes and fixes the inconsistent click/alert behavior.
+
