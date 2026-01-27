@@ -26,3 +26,10 @@
 - **How I fixed it**: Initialized `checkins` as an empty array (`useState([])`) so that `reduce` always operates on an array, even before data is fetched.
 - **Why this fix is correct**: Using an empty array as the initial state matches the expected data shape and makes `reduce` safe at all times; an empty history correctly yields `0` total hours and the page no longer crashes while data is loading.
 
+## Bug 5: API returns wrong status codes in certain scenarios
+
+- **Location**: `backend/routes/checkin.js`, lines 27–31
+- **What was wrong**: When `client_id` was missing in the check-in request body, the API returned `status(200)` with `success: false`. This reports a validation error as a successful HTTP response, which is misleading for clients and breaks conventional error handling.
+- **How I fixed it**: Changed the response to use `status(400)` (Bad Request) while keeping the same error message payload when `client_id` is not provided.
+- **Why this fix is correct**: A missing required field is a client-side input error and should use a 4xx status; using `400` allows frontend code and API consumers to reliably distinguish between successful and failed requests and aligns the endpoint with standard REST semantics.
+
