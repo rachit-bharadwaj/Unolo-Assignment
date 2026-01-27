@@ -29,7 +29,7 @@ router.get('/daily-summary', authenticateToken, requireManager, async (req, res)
 
         const managerId = req.user.id;
 
-        // Per-employee breakdown: check-ins, unique clients, and total working minutes
+        // Per-employee breakdown: check-ins, unique clients, and total working minutes (SQLite-compatible)
         let perEmployeeQuery = `
             SELECT 
                 u.id AS employee_id,
@@ -39,7 +39,7 @@ router.get('/daily-summary', authenticateToken, requireManager, async (req, res)
                 SUM(
                     CASE 
                         WHEN ch.checkout_time IS NOT NULL 
-                        THEN TIMESTAMPDIFF(MINUTE, ch.checkin_time, ch.checkout_time)
+                        THEN CAST((julianday(ch.checkout_time) - julianday(ch.checkin_time)) * 24 * 60 AS INTEGER)
                         ELSE 0
                     END
                 ) AS total_minutes
@@ -60,7 +60,7 @@ router.get('/daily-summary', authenticateToken, requireManager, async (req, res)
 
         const [perEmployeeRows] = await pool.execute(perEmployeeQuery, perEmployeeParams);
 
-        // Team-level aggregate statistics for the same date and optional employee filter
+        // Team-level aggregate statistics for the same date and optional employee filter (SQLite-compatible)
         let teamQuery = `
             SELECT 
                 COUNT(DISTINCT u.id) AS team_members,
@@ -69,7 +69,7 @@ router.get('/daily-summary', authenticateToken, requireManager, async (req, res)
                 SUM(
                     CASE 
                         WHEN ch.checkout_time IS NOT NULL 
-                        THEN TIMESTAMPDIFF(MINUTE, ch.checkin_time, ch.checkout_time)
+                        THEN CAST((julianday(ch.checkout_time) - julianday(ch.checkin_time)) * 24 * 60 AS INTEGER)
                         ELSE 0
                     END
                 ) AS total_minutes
