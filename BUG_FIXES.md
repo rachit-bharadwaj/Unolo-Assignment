@@ -19,3 +19,10 @@
 - **How I fixed it**: Changed the endpoint selection logic to use the user's `role` (`user.role === 'manager' ? '/dashboard/stats' : '/dashboard/employee'`) instead of hardcoding an ID check.
 - **Why this fix is correct**: The backend already enforces manager access using the `role` in JWT; basing the frontend behavior on `role` keeps it consistent with the authorization logic and works for any manager user, regardless of their numeric ID.
 
+## Bug 4: Attendance history page crashes on load
+
+- **Location**: `frontend/src/pages/History.jsx`, lines 4–6 and 45–53
+- **What was wrong**: The `checkins` state was initialized to `null`, but the code immediately called `checkins.reduce(...)` to compute `totalHours`. When the component first rendered (before data was loaded), calling `reduce` on `null` threw a runtime error, causing the history page to crash.
+- **How I fixed it**: Initialized `checkins` as an empty array (`useState([])`) so that `reduce` always operates on an array, even before data is fetched.
+- **Why this fix is correct**: Using an empty array as the initial state matches the expected data shape and makes `reduce` safe at all times; an empty history correctly yields `0` total hours and the page no longer crashes while data is loading.
+

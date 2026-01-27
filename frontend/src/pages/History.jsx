@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../utils/api';
 
 function History({ user }) {
-    const [checkins, setCheckins] = useState(null);
+    const [checkins, setCheckins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [startDate, setStartDate] = useState('');
