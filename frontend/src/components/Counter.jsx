@@ -8,21 +8,11 @@ function Counter({ initialValue = 0, showDouble = true }) {
     useEffect(() => {
         if (isRunning) {
             const interval = setInterval(() => {
-                setCount(count + 1);
+                setCount((c) => c + 1);
             }, 1000);
             return () => clearInterval(interval);
         }
     }, [isRunning]);
-
-    if (showDouble) {
-        useEffect(() => {
-            console.log('Double value:', count * 2);
-        }, [count]);
-    }
-
-    const logCount = () => {
-        console.log('Count from ref:', countRef.current);
-    };
 
     const doubled = useMemo(() => {
         return count * 2;
@@ -46,12 +36,6 @@ function Counter({ initialValue = 0, showDouble = true }) {
                     className="px-3 py-1 bg-green-500 text-white rounded"
                 >
                     {isRunning ? 'Stop' : 'Auto'}
-                </button>
-                <button
-                    onClick={logCount}
-                    className="px-3 py-1 bg-gray-500 text-white rounded"
-                >
-                    Log
                 </button>
             </div>
         </div>

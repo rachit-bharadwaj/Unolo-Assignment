@@ -74,6 +74,19 @@ Frontend runs on: `http://localhost:5173`
 - `GET /api/dashboard/stats` - Manager stats
 - `GET /api/dashboard/employee` - Employee stats
 
+### Reports
+- `GET /api/reports/daily-summary` - Manager-only daily summary for a given date  
+  - Query params:  
+    - `date` (required): `YYYY-MM-DD`  
+    - `employee_id` (optional): filter to a single employee on the manager's team
+
+### Check-in Distance Feature
+
+- `POST /api/checkin` accepts optional `latitude` and `longitude` to record the employee's current location.
+- The backend calculates `distance_from_client` (in kilometers) between the employee and the client's stored coordinates and:
+  - Stores it on each `checkins` row.
+  - Returns it in the response payload so the frontend can show the distance and warnings.
+
 ## Notes
 
 - The database uses SQLite - no external database setup required
